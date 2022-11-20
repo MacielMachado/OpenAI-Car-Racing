@@ -19,10 +19,9 @@ class Tester():
             obs = DataHandler().to_greyscale(obs)
             obs = DataHandler().normalizing(obs)
             obs_tensor = torch.from_numpy(obs).float().unsqueeze(0).unsqueeze(0).to(self.device)
-            action_tensor = self.model(obs_tensor).to("cpu")
-            action = action_tensor.detach().numpy()[0]
+            action = self.model(obs_tensor).to("cpu")
 
-            obs, new_reward, done, _ = self.env.step(action)
+            obs, new_reward, done, _ = self.env.step(action.detach().numpy()[0])
             reward += new_reward
             if self.render: self.env.render()
             if done: break
@@ -30,6 +29,5 @@ class Tester():
 if __name__ == '__main__':
     model = Model()
     model.load_state_dict(torch.load("./model_pytorch/model.pkl"))
-    env_interface = CarRacingInterface(render = True)
     env = CarRacing()
     Tester(model=model,env=env).run()

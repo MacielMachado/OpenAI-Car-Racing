@@ -1,6 +1,7 @@
 from data_precessing import DataHandler
 from model import Model, Model2
 import numpy as np
+import wandb
 import torch
 import os
 
@@ -16,16 +17,35 @@ class Trainer():
         self.batch_size = batch_size
         self.model = model.to(device)
 
+    def wandb_init(self):
+        wandb.init(
+            project="OpenAI-Car-Racing",
+            config={
+                "loss_func": 'MSE',
+                "batch_size": self.batch_size,
+            }
+        )
+
+    def extract_action_MSE(self, y, y_hat):
+        assert len(y) == len(y_hat)
+        y_diff = y - y_hat
+        y_diff_pow_2 = torch.pow(y_diff, 2)
+        y_diff_sum = torch.sum(y_diff_pow_2, dim=0)/len(y)
+        y_diff_sqrt = torch.pow(y_diff_sum, 0.5)
+        return y_diff_sqrt
+
     def run(self):
+        self.wandb_init()
         train_loader = self._dataloader()
         validation_loader = self._dataloader(dataset='test')
         self._training_loop(train_loader)
+        wandb.finish()
         self._validation(validation_loader)
         self._save_model()
 
     def _save_model(self):
         os.makedirs('model_pytorch', exist_ok=True)
-        torch.save(self.model.state_dict(), os.getcwd()+'/model_pytorch'+'/model.pkl')
+        torch.save(self.model.state_dict(), os.getcwd()+'/model_pytorch'+'/model_wandb.pkl')
 
     def _training_loop(self, train_loader):
         loss = 0
@@ -36,13 +56,21 @@ class Trainer():
             X = X.unsqueeze(1).float()
             y_hat = self.model(X.to(self.device))
             loss = self.loss_func(y_hat, y.to(self.device))
+            action_MSE = self.extract_action_MSE(y.to(self.device), y_hat)
             loss.backward()
             self.optimizer.step()
             iter += 1
             loss_bin += loss.item()
             if index % 10 == 0:
                 print(f'Batch {index} loss: {loss.item()}')
-        print(f'Epoch average loss: {loss_bin/iter}')
+
+            # log metrics to wandb
+            wandb.log({"loss": loss.item(),
+                        "left_action_MSE": action_MSE[0],
+                        "acceleration_action_MSE": action_MSE[1],
+                        "right_action_MSE": action_MSE[2]})
+            
+            print(f'Epoch average loss: {loss_bin/iter}')
 
     def _validation(self, test_loader):
         loss = 0

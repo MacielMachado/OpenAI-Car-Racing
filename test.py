@@ -23,6 +23,7 @@ class Tester():
 
             obs, new_reward, done, _ = self.env.step(action.detach().numpy()[0])
             reward += new_reward
+            print(f'{reward}')
             if self.render: self.env.render()
             if done: break
 

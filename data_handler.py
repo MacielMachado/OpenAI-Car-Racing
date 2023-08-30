@@ -22,6 +22,7 @@ class DataHandler():
         self.to_greyscale()
         self.load_actions()
         self._normalize_inputs()
+        self.stack_with_previous()
         # self.augment_turn_data()
         # self.plot_actions()
         # self.plot_state()
@@ -69,8 +70,8 @@ class DataHandler():
         ''' Append all states recordings and all actions recordings.
         '''
         files = [f for f in os.listdir(self.path) if f.endswith('.npy')]
-        states = [f for f in files if 'states' in f]
-        states = [f for f in files if 'actions' in f]
+        observations = [f for f in files if 'states' in f]
+        actions = [f for f in files if 'actions' in f]
 
     def augment_turn_data(self, augmentation=3):
         ''' Augment the number of data of when the car is turning.
@@ -101,9 +102,33 @@ class DataHandler():
         self.actions[:,0] = (self.actions[:,0]+1)/2
         self.actions[:,2] = (self.actions[:,2])/0.8
 
+    def stack_with_previous(self):
+        images_array = self.states
+        images_array = np.expand_dims(images_array, axis=-1)
+        batch_size, height, width, channels = images_array.shape
+        stacked_images = np.zeros((batch_size, height, width, channels * 4), dtype=images_array.dtype)
+
+        for i in range(batch_size):
+            if i < 3:
+                    stacked_images[i, :, :, :] = np.concatenate([
+                    images_array[i, :, :, :],
+                    images_array[i, :, :, :],
+                    images_array[i, :, :, :],
+                    images_array[i, :, :, :]
+                ], axis=-1)
+            else:
+                stacked_images[i, :, :, :] = np.concatenate([
+                    images_array[i, :, :, :],
+                    images_array[i - 1, :, :, :],
+                    images_array[i - 2, :, :, :],
+                    images_array[i - 3, :, :, :]
+                ], axis=-1)
+
+        return stacked_images
 
 if __name__ == '__main__':
     constructor = DataHandler(state_file_name='/tutorial/TRAIN/states_TRAIN.npy',
                      actions_file_name='/tutorial/TRAIN/actions_TRAIN.npy',)
     constructor.load_data()
-    constructor.append_all_recordings()
+    # constructor.append_all_recordings()
+    constructor.stack_with_previous()

@@ -2,7 +2,7 @@ from torch import nn
 import torch
 
 class Model(nn.Module):
-    def __init__(self, input_ch=1, ch=4):
+    def __init__(self, input_ch=4, ch=8):
         super().__init__()
         self.conv_layer = nn.Sequential(
             nn.Conv2d(in_channels=input_ch, out_channels=8*ch, kernel_size=(7,7)),
@@ -19,13 +19,14 @@ class Model(nn.Module):
             nn.ReLU(),
         )
         self.flat_layer = nn.Sequential(
-            nn.Linear(64*ch*1*1, 256),
+            nn.Linear(64*ch*1*1, 1024),
             nn.ReLU()
         )
-        self.output = nn.Linear(in_features=256, out_features=3)
+        self.output = nn.Linear(in_features=1024, out_features=3)
 
     def forward(self, x):
-        x = self.conv_layer(x)
+        x = x.permute(0, 3, 2, 1)
+        x = self.conv_layer(x.to(torch.float32))
         x = x.view(x.size(0), -1)
         x = self.flat_layer(x)
         x = self.output(x)
